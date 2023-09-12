@@ -22,8 +22,6 @@ class DecisionTree:
                 to the features.
             y (pd.Series): a vector of discrete ground-truth labels
         """
-        # TODO: Implement
-
         """
         Calculating total entropy
         """
@@ -32,55 +30,47 @@ class DecisionTree:
         print(tot_entropy)
 
         """
-        Calculating entropy for each feature
+        Calculating entropy and information gain for each feature
         """
 
         data = X.merge(y.to_frame(), left_index=True, right_index=True)
         attr_names = X.columns.to_list()
-        items_data = []
+        num_of_rows = X.shape[0]
+        entropy_data = []
+        info_gain_data = []
 
         for n in attr_names:
+            value_count_df = X[n].value_counts()
             values = X[n].unique()
+            information_number = 0 # Used for calculating information gain
             for v in values:
                 filtered_data = data[data[n] == v]
-                entropy_arr = filtered_data[y.name].value_counts().to_numpy(dtype=int)
+                value_df = filtered_data[y.name].value_counts()
+                entropy_arr = value_df.to_numpy(dtype=int)
                 value_entropy = entropy(entropy_arr)
-                item = {'Label': n, 'Value': v, 'Entropy': value_entropy}
-                items_data.append(item)
+                quantity = value_count_df[v]/num_of_rows
+                entropy_item = {'Attribute': n, 'Value': v, 'Quantity': quantity, 'Entropy': value_entropy}
+                entropy_data.append(entropy_item)
 
-        entropy_df = pd.DataFrame(items_data) # df with the entropy of the different values of the different attributes
+                # Calculating information number
+                information_number += quantity * value_entropy
+
+            information_gain = tot_entropy - information_number
+            info_gain_item = {'Attribute': n, 'Information_gain': information_gain}
+            info_gain_data.append(info_gain_item)
+
+        entropy_df = pd.DataFrame(entropy_data) # df with the entropy of the different values of the different attributes
+        info_gain_df = pd.DataFrame(info_gain_data) # df with the information gain of each attributes
         print(entropy_df.head())
 
-        """
-        Calculating entropy for each feature
-        
-        feature_value_data: df containing data with a specific value of a feature (eg. Outlook = Sunny)
-        label: string, name of the label of the df (=PlayTennis)
-        class_list: list, unique classes of the label (=[Yes, No])
-        
-        returns float, calculated entropy of the feature value df (eg. for Outlook = Sunny returns 0.971)
-        """
-        """
-        def calc_entropy(feature_value_data, label, class_list):
-            class_count = feature_value_data.shape[0]
-            entropy = 0
+        # Sorting the df to get the attribute with the highest information gain
+        sorted_info_gain_df = info_gain_df.sort_values(by='Information_gain', ascending=False)
+        print(sorted_info_gain_df.head())
 
-            for c in class_list:
-                label_class_count = feature_value_data[feature_value_data[label] == c].shape[0]
-                entropy_class = 0
-                if label_class_count != 0:
-                    probability_class = label_class_count/class_count #probability of the class
-                    entropy_class = - probability_class * np.log2(probability_class) #entropy
-                entropy += entropy_class
-            return entropy
-
-        df = X.merge(y.to_frame(), left_index=True, right_index=True)
-
-        print(df.head())
-        """
+        max_info_feature = sorted_info_gain_df['Attribute'].iloc[0]
+        print(max_info_feature)
 
 
-        #raise NotImplementedError()
 
     def predict(self, X):
         """
@@ -96,8 +86,8 @@ class DecisionTree:
         Returns:
             A length m vector with predictions
         """
-        # TODO: Implement 
-        raise NotImplementedError()
+
+        # raise NotImplementedError()
     
     def get_rules(self):
         """
