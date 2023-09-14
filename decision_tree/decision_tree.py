@@ -1,76 +1,119 @@
-import numpy as np 
+import numpy as np
 import pandas as pd
-import array
+from math import log2
+from collections import Counter
+import random
+
+
 # IMPORTANT: DO NOT USE ANY OTHER 3RD PARTY PACKAGES
 # (math, random, collections, functools, etc. are perfectly fine)
 
 
 class DecisionTree:
-    
-    def __init__(self):
-        # NOTE: Feel free add any hyperparameters 
+
+    def __init__(self, max_depth=4, min_samples_split=3, min_samples_leaf=1):
+        # NOTE: Feel free add any hyperparameters
         # (with defaults) as you see fit
-        pass
-    
+        self.tree = {}
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.min_samples_leaf = min_samples_leaf
+
     def fit(self, X, y):
         """
         Generates a decision tree for classification
-        
+
         Args:
             X (pd.DataFrame): a matrix with discrete value where
                 each row is a sample and the columns correspond
                 to the features.
             y (pd.Series): a vector of discrete ground-truth labels
         """
-        """
-        Calculating total entropy
-        """
-        tot_entropy_arr = y.value_counts().to_numpy(dtype=int)
-        tot_entropy = entropy(tot_entropy_arr)
-        print(tot_entropy)
 
         """
-        Calculating entropy and information gain for each feature
+        Building the tree using some hyperparameters
         """
+        self.tree = self._build_tree(X, y, self.max_depth, self.min_samples_split, self.min_samples_leaf)
 
-        data = X.merge(y.to_frame(), left_index=True, right_index=True)
-        attr_names = X.columns.to_list()
-        num_of_rows = X.shape[0]
-        entropy_data = []
-        info_gain_data = []
+    def _entropy(self, y):
+        """
+        Calculate the entropy of a set of labels y.
+        """
+        if len(y) == 0:
+            return 0
 
-        for n in attr_names:
-            value_count_df = X[n].value_counts()
-            values = X[n].unique()
-            information_number = 0 # Used for calculating information gain
-            for v in values:
-                filtered_data = data[data[n] == v]
-                value_df = filtered_data[y.name].value_counts()
-                entropy_arr = value_df.to_numpy(dtype=int)
-                value_entropy = entropy(entropy_arr)
-                quantity = value_count_df[v]/num_of_rows
-                entropy_item = {'Attribute': n, 'Value': v, 'Quantity': quantity, 'Entropy': value_entropy}
-                entropy_data.append(entropy_item)
+        class_counts = Counter(y)
+        entropy = 0
+        total_samples = len(y)
 
-                # Calculating information number
-                information_number += quantity * value_entropy
+        for count in class_counts.values():
+            p = count / total_samples
+            entropy -= p * log2(p)
 
-            information_gain = tot_entropy - information_number
-            info_gain_item = {'Attribute': n, 'Information_gain': information_gain}
-            info_gain_data.append(info_gain_item)
+        return entropy
 
-        entropy_df = pd.DataFrame(entropy_data) # df with the entropy of the different values of the different attributes
-        info_gain_df = pd.DataFrame(info_gain_data) # df with the information gain of each attributes
-        print(entropy_df.head())
+    def _information_gain(self, X, y, feature):
+        """
+        Calculate the information gain for a specific feature.
+        """
+        total_entropy = self._entropy(y)
+        values = X[feature].unique()
+        weighted_entropy = 0
 
-        # Sorting the df to get the attribute with the highest information gain
-        sorted_info_gain_df = info_gain_df.sort_values(by='Information_gain', ascending=False)
-        print(sorted_info_gain_df.head())
+        for value in values:
+            subset = y[X[feature] == value]
+            weighted_entropy += (len(subset) / len(y)) * self._entropy(subset)
 
-        max_info_feature = sorted_info_gain_df['Attribute'].iloc[0]
-        print(max_info_feature)
+        information_gain = total_entropy - weighted_entropy
+        return information_gain
 
+    def _build_tree(self, X, y, max_depth=None, min_samples_split=2, min_samples_leaf=1):
+        """
+        Recursively build the decision tree with hyperparameters.
+        """
+        # If all labels are the same or depth limit reached, return that label as a leaf node
+        if len(set(y)) == 1 or max_depth == 0:
+            return y.iloc[0]
 
+        # If there are no features left to split on, return the most common label
+        if len(X.columns) == 0:
+            return y.mode()[0]
+
+        # If the number of samples is less than the minimum for splitting, return a leaf node
+        if len(X) < min_samples_split:
+            return y.mode()[0]
+
+        # Find the feature with the highest information gain
+        max_info_gain = -1
+        best_feature = None
+
+        for feature in X.columns:
+            info_gain = self._information_gain(X, y, feature)
+            if info_gain > max_info_gain:
+                max_info_gain = info_gain
+                best_feature = feature
+
+        # Check if the number of samples in the subset is less than the minimum for a leaf node
+        if len(X) < min_samples_leaf:
+            return y.mode()[0]
+
+        # Create a sub-tree for each unique value of the best feature
+        tree = {best_feature: {}}
+        for value in X[best_feature].unique():
+            # Split the data and labels based on the best feature's value
+            X_subset = X[X[best_feature] == value].drop(columns=best_feature)
+            y_subset = y[X[best_feature] == value]
+
+            # Check if the number of samples in the subset is less than the minimum for a leaf node
+            if len(X_subset) < min_samples_leaf:
+                tree[best_feature][value] = y_subset.mode()[0]
+            else:
+                # Recursively build the sub-tree with reduced depth and hyperparameters
+                tree[best_feature][value] = self._build_tree(
+                    X_subset, y_subset, max_depth - 1, min_samples_split, min_samples_leaf
+                )
+
+        return tree
 
     def predict(self, X):
         """
@@ -86,7 +129,34 @@ class DecisionTree:
         Returns:
             A length m vector with predictions
         """
+        if not self.tree:
+            raise ValueError("The decision tree has not been trained. Call .fit() first.")
 
+        predictions = []
+        for _, row in X.iterrows():
+            prediction = self._predict_tree(self.tree, row)
+            predictions.append(prediction)
+
+        return np.array(predictions)
+
+    def _predict_tree(self, tree, sample):
+        """
+        Recursively navigate the decision tree to make predictions.
+        """
+        # If we reach a leaf node (a class label), return it as the prediction
+        if not isinstance(tree, dict):
+            return tree
+
+        # Otherwise, find the feature in the current node and follow the branch
+        feature = list(tree.keys())[0]
+        value = sample[feature]
+
+        if value in tree[feature]:
+            # Recursively follow the branch
+            return self._predict_tree(tree[feature][value], sample)
+        else:
+            # If the value is not in the tree, return the most common class label at this node
+            return max(tree[feature], key=tree[feature].get)
         # raise NotImplementedError()
     
     def get_rules(self):
@@ -107,8 +177,20 @@ class DecisionTree:
             ...
         ]
         """
-        # TODO: Implement
-        raise NotImplementedError()
+        rules = []
+        self._extract_rules(self.tree, [], rules)
+        return rules
+
+    def _extract_rules(self, node, antecedent, rules):
+        if isinstance(node, dict):
+            for feature, branches in node.items():
+                for value, sub_node in branches.items():
+                    new_antecedent = antecedent + [(feature, value)]
+                    self._extract_rules(sub_node, new_antecedent, rules)
+        else:
+            label = node
+            rules.append((antecedent, label))
+        # raise NotImplementedError()
 
 
 # --- Some utility functions 
