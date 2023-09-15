@@ -11,13 +11,14 @@ import random
 
 class DecisionTree:
 
-    def __init__(self, max_depth=4, min_samples_split=3, min_samples_leaf=1):
+    def __init__(self, max_depth=4, min_samples_split=3, min_samples_leaf=1, min_info_gain=0.15):
         # NOTE: Feel free add any hyperparameters
         # (with defaults) as you see fit
         self.tree = {}
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
+        self.min_info_gain = min_info_gain
 
     def fit(self, X, y):
         """
@@ -33,7 +34,7 @@ class DecisionTree:
         """
         Building the tree using some hyperparameters
         """
-        self.tree = self._build_tree(X, y, self.max_depth, self.min_samples_split, self.min_samples_leaf)
+        self.tree = self._build_tree(X, y)
 
     def _entropy(self, y):
         """
@@ -67,12 +68,12 @@ class DecisionTree:
         information_gain = total_entropy - weighted_entropy
         return information_gain
 
-    def _build_tree(self, X, y, max_depth=None, min_samples_split=2, min_samples_leaf=1):
+    def _build_tree(self, X, y):
         """
         Recursively build the decision tree with hyperparameters.
         """
         # If all labels are the same or depth limit reached, return that label as a leaf node
-        if len(set(y)) == 1 or max_depth == 0:
+        if len(set(y)) == 1 or self.max_depth == 0:
             return y.iloc[0]
 
         # If there are no features left to split on, return the most common label
@@ -80,7 +81,7 @@ class DecisionTree:
             return y.mode()[0]
 
         # If the number of samples is less than the minimum for splitting, return a leaf node
-        if len(X) < min_samples_split:
+        if len(X) < self.min_samples_split:
             return y.mode()[0]
 
         # Find the feature with the highest information gain
@@ -89,12 +90,12 @@ class DecisionTree:
 
         for feature in X.columns:
             info_gain = self._information_gain(X, y, feature)
-            if info_gain > max_info_gain:
+            if info_gain > max_info_gain and info_gain >= self.min_info_gain:  # Check against min_info_gain
                 max_info_gain = info_gain
                 best_feature = feature
 
         # Check if the number of samples in the subset is less than the minimum for a leaf node
-        if len(X) < min_samples_leaf:
+        if len(X) < self.min_samples_leaf:
             return y.mode()[0]
 
         # Create a sub-tree for each unique value of the best feature
@@ -105,13 +106,11 @@ class DecisionTree:
             y_subset = y[X[best_feature] == value]
 
             # Check if the number of samples in the subset is less than the minimum for a leaf node
-            if len(X_subset) < min_samples_leaf:
+            if len(X_subset) < self.min_samples_leaf:
                 tree[best_feature][value] = y_subset.mode()[0]
             else:
                 # Recursively build the sub-tree with reduced depth and hyperparameters
-                tree[best_feature][value] = self._build_tree(
-                    X_subset, y_subset, max_depth - 1, min_samples_split, min_samples_leaf
-                )
+                tree[best_feature][value] = self._build_tree(X_subset, y_subset)
 
         return tree
 
