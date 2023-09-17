@@ -11,7 +11,7 @@ import random
 
 class DecisionTree:
 
-    def __init__(self, max_depth=4, min_samples_split=3, min_samples_leaf=1, min_info_gain=0.15):
+    def __init__(self, max_depth=5, min_samples_split=2, min_samples_leaf=1, min_info_gain=0):
         # NOTE: Feel free add any hyperparameters
         # (with defaults) as you see fit
         self.tree = {}

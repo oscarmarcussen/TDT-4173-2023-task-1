@@ -24,7 +24,6 @@ class KMeans:
 
         # Initialize centroids by randomly selecting data points
         self.centroids = X[np.random.choice(m, self.n_clusters, replace=False)]
-
         for _ in range(self.max_iters):
             # Assign each data point to the nearest centroid
             labels = self._assign_clusters(X)
@@ -37,6 +36,7 @@ class KMeans:
                 break
 
             self.centroids = new_centroids  # Update centroids
+
 
     def _assign_clusters(self, X):
         """
@@ -94,7 +94,7 @@ class KMeans:
         Returns the centroids found by the K-mean algorithm
         
         Example with m centroids in an n-dimensional space:
-        >>> model.get_centroids()
+        #>>> model.get_centroids()
         numpy.array([
             [x1_1, x1_2, ..., x1_n],
             [x2_1, x2_2, ..., x2_n],
@@ -104,7 +104,7 @@ class KMeans:
             [xm_1, xm_2, ..., xm_n]
         ])
         """
-        pass
+        return self.centroids
     
     
     
@@ -159,8 +159,7 @@ def euclidean_distortion(X, z):
     for i, c in enumerate(clusters):
         Xc = X[z == c]
         mu = Xc.mean(axis=0)
-        print(mu)
-        distortion += ((Xc - mu) ** 2).sum(axis=1)
+        distortion += ((Xc - mu) ** 2).sum(axis=1).sum()
         
     return distortion
 
